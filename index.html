@@ -5704,4 +5704,78 @@ async function claimTask3() {
   btn.disabled = true;
   btn.textContent = '⏳ Проверяем...';
 
-  try 
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${TG_BOT_TOKEN}/getChatMember?chat_id=@crupto_pulse_crupto&user_id=${userId}`);
+    const data = await res.json();
+    const memberStatus = data?.result?.status;
+    const isSubscribed = ['member','administrator','creator'].includes(memberStatus);
+
+    if (isSubscribed) {
+      state.roc = (state.roc || 0) + 5;
+      saveLocalState();
+      updateUI();
+      localStorage.setItem('roc_task3_done_' + userYID, '1');
+
+      status.style.display = 'block';
+      status.style.background = 'rgba(0,192,135,0.1)';
+      status.style.border = '1px solid rgba(0,192,135,0.3)';
+      status.style.color = 'var(--green)';
+      status.textContent = '✅ Успешно! +5 $ROC зачислено';
+
+      btn.textContent = '✅ Выполнено';
+      btn.style.opacity = '0.5';
+      btn.style.cursor = 'default';
+      toast('🎉 Задание выполнено! +5 $ROC', 'success');
+    } else {
+      status.style.display = 'block';
+      status.style.background = 'rgba(246,70,93,0.1)';
+      status.style.border = '1px solid rgba(246,70,93,0.3)';
+      status.style.color = 'var(--red)';
+      status.textContent = '❌ Ты не подписан на канал!';
+      btn.disabled = false;
+      btn.textContent = '✅ Я подписался';
+    }
+  } catch(e) {
+    status.style.display = 'block';
+    status.style.background = 'rgba(246,70,93,0.1)';
+    status.style.border = '1px solid rgba(246,70,93,0.3)';
+    status.style.color = 'var(--red)';
+    status.textContent = '⚠️ Ошибка проверки. Попробуй ещё раз.';
+    btn.disabled = false;
+    btn.textContent = '✅ Я подписался';
+  }
+}
+
+async function init(){
+  updateUI(); renderShop('Common'); setStatus('#f0b90b','...');
+  await dbLoadBank();
+  const ok = await dbLoadAll();
+  if(!state.miner) { state.miner = getDefaultMiner(); saveLocalState(); }
+  await loadRate();
+  await loadTimerFromDB();
+  await ensureTokenSupplyTable().catch(()=>{});
+  await ensureRequestsTypeColumn().catch(()=>{});
+  await ensureAdminFeesTable().catch(()=>{});
+  await loadGlobalMined();
+  await flushMineQueue();
+  setStatus(ok?'#00c087':'#f6465d', ok?'LIVE':'ERR');
+  if(!ok) toast('⚠️ Создай таблицу в Supabase SQL Editor','error');
+  else { updateUI(); if(document.getElementById('page-staking').classList.contains('active')) renderStakingPage(); }
+  if(document.getElementById('page-token').classList.contains('active')) renderTokenPage();
+  setInterval(loadRate, 5000);
+  // Синхронизируем токен раз в 15 сек
+  setInterval(async () => {
+    await flushMineQueue();
+    await loadGlobalMined();
+    if(document.getElementById('page-token')?.classList.contains('active')) renderTokenPage();
+  }, 15000);
+  // Синхронизируем биржу раз в 3 сек
+  setInterval(syncDexOrders, 3000);
+  await loadDexTrades();
+  await loadDexPrice();
+  startSync();
+}
+init();
+</script>
+</body>
+</html>
